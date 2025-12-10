@@ -12,12 +12,23 @@ st.set_page_config(page_title="Üniversite Etkinlik Takip Sistemi", layout="wide
 MAX_KULLANICI_SAYISI = 6  # 1 Admin + 5 Kullanıcı
 
 # --- GÜVENLİK (SECRETS) ---
+# Hem Gmail hem de Admin bilgilerini 'Secrets'tan çekiyoruz.
 GMAIL_ADRESI = ""
 GMAIL_SIFRESI = ""
+ADMIN_KADI = "admin" # Varsayılan (Eğer secrets yoksa)
+ADMIN_SIFRE = "1234" # Varsayılan
+ADMIN_MAIL = "admin@sistem.com"
+
 try:
     if "GMAIL_ADRESI" in st.secrets:
         GMAIL_ADRESI = st.secrets["GMAIL_ADRESI"]
         GMAIL_SIFRESI = st.secrets["GMAIL_SIFRESI"]
+    
+    # Admin bilgilerini güvenli alandan al
+    if "ADMIN_KADI" in st.secrets:
+        ADMIN_KADI = st.secrets["ADMIN_KADI"]
+        ADMIN_SIFRE = st.secrets["ADMIN_SIFRE"]
+        ADMIN_MAIL = st.secrets["ADMIN_MAIL"]
 except:
     pass
 
@@ -37,8 +48,8 @@ def kullanicilari_yukle():
     if os.path.exists(KULLANICI_DOSYASI):
         return pd.read_csv(KULLANICI_DOSYASI, dtype=str)
     else:
-        # Dosya yoksa Admin'i oluştur
-        df = pd.DataFrame([["admin", "1234", "admin@universite.edu.tr"]], columns=["kullanici_adi", "sifre", "email"])
+        # Dosya yoksa, Secrets'tan gelen güvenli Admin ile oluştur
+        df = pd.DataFrame([[ADMIN_KADI, ADMIN_SIFRE, ADMIN_MAIL]], columns=["kullanici_adi", "sifre", "email"])
         df.to_csv(KULLANICI_DOSYASI, index=False)
         return df
 
@@ -155,12 +166,19 @@ def giris_ekrani_goster():
 
 def ana_uygulama_goster():
     user = st.session_state['aktif_kullanici'].upper()
+    
+    # 🕵️ GÜVENLİK AYARI: Giriş yapan kişi Secrets'taki Admin mi?
+    IS_ADMIN = False
+    if user == ADMIN_KADI.upper():
+        IS_ADMIN = True
+    
     df_etkinlikler = etkinlikleri_yukle()
 
     with st.sidebar:
         st.success(f"👤 Aktif: {user}")
-        if user == "ADMIN":
+        if IS_ADMIN:
             with st.expander("Yönetici Paneli"):
+                st.write(f"Yönetici: {ADMIN_KADI}")
                 st.download_button("Kullanıcılar (CSV)", kullanicilari_yukle().to_csv(index=False).encode('utf-8'), "users.csv")
                 st.download_button("Etkinlikler (CSV)", df_etkinlikler.to_csv(index=False).encode('utf-8'), "events.csv")
         
@@ -209,7 +227,7 @@ def ana_uygulama_goster():
             st.subheader("2. Paydaş ve Konuşmacı Planlaması")
             cevaplar['p5'] = st.checkbox("Konuşmacı ve işveren kurumu belli mi?", value=get_val('p5'))
             cevaplar['p6'] = st.checkbox("Resmî davet gönderildi", value=get_val('p6'))
-            cevaplar['p7'] = st.checkbox("Konuşmacı özgeçmişi/etkinlik özeti alındı", value=get_val('p7'))
+            cevaplar['p7'] = st.checkbox("Konuşmacı Özgeçmişi/etkinlik özeti alındı", value=get_val('p7'))
             cevaplar['p8'] = st.checkbox("Konuşmacı ihtiyaçları planlandı", value=get_val('p8'))
         with c2:
             st.subheader("3. Zaman/Mekan Kaynak Planlaması")
@@ -236,7 +254,7 @@ def ana_uygulama_goster():
             cevaplar['k5'] = st.checkbox("Konuşmacı değerlendirmesi alındı", value=get_val('k5'))
             cevaplar['k6'] = st.checkbox("Teknik süreçlerin güçlü/zayıf yönleri kaydedildi", value=get_val('k6'))
         with c2:
-            st.subheader("3. Etkinlik Çıktıları")
+            st.subheader("3. Etkinlik Çıktılar")
             cevaplar['k7'] = st.checkbox("Beklenen amaç ve kazanımlar gerçekleşti mi?", value=get_val('k7'))
             cevaplar['k8'] = st.checkbox("Paydaş geri bildirimleri analiz edildi mi?", value=get_val('k8'))
             cevaplar['k9'] = st.checkbox("Sunum ve materyaller arşivlendi mi?", value=get_val('k9'))
@@ -252,7 +270,7 @@ def ana_uygulama_goster():
             st.subheader("2. Raporlama ve Arşiv")
             cevaplar['o4'] = st.checkbox("Etkinlik raporu hazırlandı", value=get_val('o4'))
             cevaplar['o5'] = st.checkbox("Fotoğraf ve haber metni paylaşıldı", value=get_val('o5'))
-            cevaplar['o6'] = st.checkbox("Tüm dokümanlar arşive eklendi", value=get_val('o6'))
+            cevaplar['o6'] = st.checkbox("Tüm dökümanlar arşive eklendi", value=get_val('o6'))
             st.subheader("3. Sürdürülebilir İyileştirme")
             cevaplar['o7'] = st.checkbox("Süreç değerlendirme toplantısı yapıldı mı?", value=get_val('o7'))
             cevaplar['o8'] = st.checkbox("İyileştirme kararları uygulanmak üzere sisteme işlendi mi?", value=get_val('o8'))
