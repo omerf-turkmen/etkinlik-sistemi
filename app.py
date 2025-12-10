@@ -12,25 +12,26 @@ st.set_page_config(page_title="Üniversite Etkinlik Takip Sistemi", layout="wide
 MAX_KULLANICI_SAYISI = 6  # 1 Admin + 5 Kullanıcı
 
 # --- GÜVENLİK (SECRETS) ---
-# Hem Gmail hem de Admin bilgilerini 'Secrets'tan çekiyoruz.
+# Kodun içine şifre yazmıyoruz. Her şeyi gizli kasadan (secrets) çekeceğiz.
 GMAIL_ADRESI = ""
 GMAIL_SIFRESI = ""
-ADMIN_KADI = "admin" # Varsayılan (Eğer secrets yoksa)
-ADMIN_SIFRE = "1234" # Varsayılan
+ADMIN_KADI = "admin" # Varsayılan (Eğer secrets girilmezse devreye girer)
+ADMIN_SIFRE = "1234"
 ADMIN_MAIL = "admin@sistem.com"
 
 try:
+    # 1. Gmail Bilgilerini Çek
     if "GMAIL_ADRESI" in st.secrets:
         GMAIL_ADRESI = st.secrets["GMAIL_ADRESI"]
         GMAIL_SIFRESI = st.secrets["GMAIL_SIFRESI"]
     
-    # Admin bilgilerini güvenli alandan al
+    # 2. Admin Bilgilerini Çek (SENİN HESABIN)
     if "ADMIN_KADI" in st.secrets:
         ADMIN_KADI = st.secrets["ADMIN_KADI"]
         ADMIN_SIFRE = st.secrets["ADMIN_SIFRE"]
         ADMIN_MAIL = st.secrets["ADMIN_MAIL"]
 except:
-    pass
+    pass # Localde çalışırken secrets yoksa hata vermesin diye
 
 # --- DOSYA İSİMLERİ ---
 KULLANICI_DOSYASI = "kullanicilar.csv"
@@ -48,7 +49,8 @@ def kullanicilari_yukle():
     if os.path.exists(KULLANICI_DOSYASI):
         return pd.read_csv(KULLANICI_DOSYASI, dtype=str)
     else:
-        # Dosya yoksa, Secrets'tan gelen güvenli Admin ile oluştur
+        # DOSYA YOKSA İLK KULLANICIYI (ADMİNİ) OLUŞTUR
+        # Buradaki bilgiler koddan değil, yukarıda Secrets'tan çekilen değişkenlerden gelir.
         df = pd.DataFrame([[ADMIN_KADI, ADMIN_SIFRE, ADMIN_MAIL]], columns=["kullanici_adi", "sifre", "email"])
         df.to_csv(KULLANICI_DOSYASI, index=False)
         return df
@@ -56,7 +58,7 @@ def kullanicilari_yukle():
 def yeni_kullanici_kaydet(kadi, sifre, email):
     df = kullanicilari_yukle()
     
-    # 🛑 LİMİT KONTROLÜ
+    # LİMİT KONTROLÜ
     mevcut_sayi = len(df)
     if mevcut_sayi >= MAX_KULLANICI_SAYISI:
         return False, f"⚠️ Maksimum kullanıcı sınırına ({MAX_KULLANICI_SAYISI} Kişi) ulaşıldı! Yeni kayıt yapılamaz."
@@ -168,14 +170,15 @@ def ana_uygulama_goster():
     user = st.session_state['aktif_kullanici'].upper()
     
     # 🕵️ GÜVENLİK AYARI: Giriş yapan kişi Secrets'taki Admin mi?
-    IS_ADMIN = False
-    if user == ADMIN_KADI.upper():
-        IS_ADMIN = True
+    # Kodu büyük harfe çevirip kıyaslıyoruz
+    IS_ADMIN = (user == ADMIN_KADI.upper())
     
     df_etkinlikler = etkinlikleri_yukle()
 
     with st.sidebar:
         st.success(f"👤 Aktif: {user}")
+        
+        # SADECE ADMIN GÖREBİLİR
         if IS_ADMIN:
             with st.expander("Yönetici Paneli"):
                 st.write(f"Yönetici: {ADMIN_KADI}")
@@ -227,7 +230,7 @@ def ana_uygulama_goster():
             st.subheader("2. Paydaş ve Konuşmacı Planlaması")
             cevaplar['p5'] = st.checkbox("Konuşmacı ve işveren kurumu belli mi?", value=get_val('p5'))
             cevaplar['p6'] = st.checkbox("Resmî davet gönderildi", value=get_val('p6'))
-            cevaplar['p7'] = st.checkbox("Konuşmacı Özgeçmişi/etkinlik özeti alındı", value=get_val('p7'))
+            cevaplar['p7'] = st.checkbox("Konuşmacı özgeçmişi/etkinlik özeti alındı", value=get_val('p7'))
             cevaplar['p8'] = st.checkbox("Konuşmacı ihtiyaçları planlandı", value=get_val('p8'))
         with c2:
             st.subheader("3. Zaman/Mekan Kaynak Planlaması")
