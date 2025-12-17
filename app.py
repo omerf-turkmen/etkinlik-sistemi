@@ -4,7 +4,7 @@ import gspread
 from oauth2client.service_account import ServiceAccountCredentials
 import time
 
-st.set_page_config(page_title="PUKÖ Takip Sistemi", layout="wide", page_icon="🎓")
+st.set_page_config(page_title="KAPUM Takip Sistemi", layout="wide", page_icon="🎓")
 
 # --- AYARLAR ---
 SHEET_ID = "19NnN6bC_kbfrtViB80REjtqvSKr7OO727i2h7cx8Z0M"
