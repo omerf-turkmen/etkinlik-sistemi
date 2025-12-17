@@ -7,7 +7,6 @@ import time
 st.set_page_config(page_title="PUKÖ Takip Sistemi", layout="wide", page_icon="🎓")
 
 # --- AYARLAR ---
-# BURAYA DİREKT ID YAZIYORUZ (Senin verdiğin ID)
 SHEET_ID = "19NnN6bC_kbfrtViB80REjtqvSKr7OO727i2h7cx8Z0M"
 MAX_KULLANICI = 6
 
@@ -41,12 +40,11 @@ def veri_cek(sayfa_adi):
     """Veriyi çeker"""
     client = get_gspread_client()
     try:
-        # DÜZELTİLEN KISIM BURASI: open -> open_by_key
         sheet = client.open_by_key(SHEET_ID).worksheet(sayfa_adi)
         data = sheet.get_all_records()
         return pd.DataFrame(data)
     except gspread.exceptions.WorksheetNotFound:
-        st.error(f"HATA: '{sayfa_adi}' isimli sekme bulunamadı! Lütfen sekme adını '{sayfa_adi}' yapın.")
+        st.error(f"HATA: '{sayfa_adi}' isimli sekme bulunamadı!")
         st.stop()
     except Exception as e:
         st.error(f"Genel Hata: {e}")
@@ -55,14 +53,12 @@ def veri_cek(sayfa_adi):
 def veri_ekle(sayfa_adi, veri_listesi):
     """Yeni satır ekler"""
     client = get_gspread_client()
-    # DÜZELTİLEN KISIM: open -> open_by_key
     sheet = client.open_by_key(SHEET_ID).worksheet(sayfa_adi)
     sheet.append_row(veri_listesi)
 
 def veri_guncelle(sayfa_adi, etkinlik_adi, yeni_veri):
     """Satırı günceller"""
     client = get_gspread_client()
-    # DÜZELTİLEN KISIM: open -> open_by_key
     sheet = client.open_by_key(SHEET_ID).worksheet(sayfa_adi)
     
     data = sheet.get_all_records()
@@ -73,6 +69,23 @@ def veri_guncelle(sayfa_adi, etkinlik_adi, yeni_veri):
         row_num = idx + 2
         sheet.delete_rows(row_num)
         sheet.append_row(yeni_veri)
+        return True
+    except:
+        return False
+
+def veri_sil(sayfa_adi, etkinlik_adi):
+    """Satırı tamamen siler"""
+    client = get_gspread_client()
+    sheet = client.open_by_key(SHEET_ID).worksheet(sayfa_adi)
+    
+    data = sheet.get_all_records()
+    df = pd.DataFrame(data)
+    
+    try:
+        # Etkinlik adına göre satırı bul ve sil
+        idx = df.index[df['Etkinlik Adı'] == etkinlik_adi].tolist()[0]
+        row_num = idx + 2 # Google Sheet 1'den başlar + 1 başlık satırı
+        sheet.delete_rows(row_num)
         return True
     except:
         return False
@@ -102,7 +115,7 @@ def yeni_kullanici_kaydet(kadi, sifre, email):
 
 # --- 4. GİRİŞ EKRANI ---
 def giris_ekrani():
-    st.markdown("<h1 style='text-align: center;'>🎓 PUKÖ Etkinlik Sistemi </h1>", unsafe_allow_html=True)
+    st.markdown("<h1 style='text-align: center;'>🎓 PUKÖ Etkinlik Sistemi (Cloud)</h1>", unsafe_allow_html=True)
     
     col1, col2, col3 = st.columns([1,1,1])
     with col2:
@@ -141,15 +154,15 @@ def ana_uygulama():
             st.rerun()
         st.divider()
         
-        mode = st.radio("İşlem:", ["Yeni Kayıt", "Düzenle"])
+        mode = st.radio("İşlem:", ["Yeni Kayıt", "Düzenle / Sil"])
         secilen_veri = {}
         eski_ad = None
         
         df_etkinlikler = veri_cek("Etkinlikler")
         
-        if mode == "Düzenle" and not df_etkinlikler.empty:
+        if mode == "Düzenle / Sil" and not df_etkinlikler.empty:
             liste = df_etkinlikler["Etkinlik Adı"].tolist()
-            eski_ad = st.selectbox("Düzenlenecek Etkinlik:", liste)
+            eski_ad = st.selectbox("İşlem Yapılacak Etkinlik:", liste)
             if eski_ad:
                 secilen_veri = df_etkinlikler[df_etkinlikler["Etkinlik Adı"] == eski_ad].iloc[0].to_dict()
 
@@ -165,7 +178,7 @@ def ana_uygulama():
         e_tarih = st.date_input("Tarih", value=mevcut_tarih)
 
     def val(kod):
-        if mode == "Düzenle" and kod in secilen_veri:
+        if mode == "Düzenle / Sil" and kod in secilen_veri:
             return bool(secilen_veri[kod])
         return False
 
@@ -250,7 +263,9 @@ def ana_uygulama():
     c1.metric("Başarı Oranı", f"%{score}")
     c1.progress(score)
     
-    btn_text = "🔄 GÜNCELLE" if mode == "Düzenle" else "💾 KAYDET"
+    # --- KAYDETME VE SİLME BUTONLARI ---
+    btn_text = "🔄 GÜNCELLE" if mode == "Düzenle / Sil" else "💾 KAYDET"
+    
     if c2.button(btn_text, type="primary", use_container_width=True):
         if not e_adi:
             st.error("Lütfen Etkinlik Adı giriniz!")
@@ -260,14 +275,14 @@ def ana_uygulama():
                 f"{tamamlanan}/{toplam_soru} Madde", ekstra_not
             ] + soru_degerleri 
             
-            with st.spinner("Kaydediliyor..."):
-                if mode == "Düzenle":
+            with st.spinner("İşlem yapılıyor..."):
+                if mode == "Düzenle / Sil":
                     basari = veri_guncelle("Etkinlikler", eski_ad, yeni_satir)
-                    msg = "Güncellendi!"
+                    msg = "Etkinlik Güncellendi!"
                 else:
                     veri_ekle("Etkinlikler", yeni_satir)
                     basari = True
-                    msg = "Kaydedildi!"
+                    msg = "Etkinlik Kaydedildi!"
             
             if basari:
                 st.success(f"✅ {msg}")
@@ -276,8 +291,22 @@ def ana_uygulama():
             else:
                 st.error("Hata oluştu!")
 
+    # --- SİLME BUTONU (SADECE DÜZENLE MODUNDA GÖRÜNÜR) ---
+    if mode == "Düzenle / Sil" and eski_ad:
+        st.divider()
+        st.warning("⚠️ Dikkat: Silinen etkinlik geri getirilemez!")
+        if st.button("🗑️ BU ETKİNLİĞİ SİL", use_container_width=True):
+            with st.spinner("Etkinlik siliniyor..."):
+                basari = veri_sil("Etkinlikler", eski_ad)
+                if basari:
+                    st.success("Etkinlik başarıyla silindi!")
+                    time.sleep(1)
+                    st.rerun()
+                else:
+                    st.error("Silme işlemi başarısız oldu.")
+
     st.divider()
-    st.subheader("Geçmiş Kayıtlar")
+    st.subheader("Geçmiş Kayıtlar (Bulut)")
     st.dataframe(df_etkinlikler)
 
 if 'giris_yapildi' not in st.session_state:
@@ -286,6 +315,4 @@ if 'giris_yapildi' not in st.session_state:
 if not st.session_state['giris_yapildi']:
     giris_ekrani()
 else:
-
     ana_uygulama()
-
