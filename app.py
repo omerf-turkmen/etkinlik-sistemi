@@ -277,7 +277,7 @@ def ana_uygulama():
                 st.error("Hata oluştu!")
 
     st.divider()
-    st.subheader("Geçmiş Kayıtlar (Bulut)")
+    st.subheader("Geçmiş Kayıtlar")
     st.dataframe(df_etkinlikler)
 
 if 'giris_yapildi' not in st.session_state:
@@ -286,4 +286,5 @@ if 'giris_yapildi' not in st.session_state:
 if not st.session_state['giris_yapildi']:
     giris_ekrani()
 else:
+
     ana_uygulama()
