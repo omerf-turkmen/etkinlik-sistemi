@@ -7,10 +7,11 @@ import time
 st.set_page_config(page_title="PUKÖ Takip Sistemi", layout="wide", page_icon="🎓")
 
 # --- AYARLAR ---
-SHEET_ADI = "Etkinlik Sistemi"  # Google Drive'daki dosya adın
+# ARTIK DOSYA ADINA GEREK YOK, ID KULLANIYORUZ (GARANTİ YÖNTEM)
+SHEET_ID = "19NnN6bC_kbfrtViB80REjtqvSKr7OO727i2h7cx8Z0M" 
 MAX_KULLANICI = 6
 
-# --- SORU KODLARI LİSTESİ (Sıralama Önemli) ---
+# --- SORU KODLARI LİSTESİ ---
 SORU_KODLARI = [
     'p1','p2','p3','p4','p5','p6','p7','p8','p9','p10','p11','p12','p13','p14','p15','p16','p17',
     'k1','k2','k3','k4','k5','k6','k7','k8','k9',
@@ -25,7 +26,6 @@ def get_gspread_client():
             st.stop()
             
         creds_dict = dict(st.secrets["gcp_service_account"])
-        # Private key içindeki \n karakterlerini düzelt
         creds_dict["private_key"] = creds_dict["private_key"].replace("\\n", "\n")
         
         scope = ["https://spreadsheets.google.com/feeds", "https://www.googleapis.com/auth/drive"]
@@ -38,46 +38,49 @@ def get_gspread_client():
 
 # --- 2. VERİTABANI İŞLEMLERİ ---
 def veri_cek(sayfa_adi):
-    """Veriyi çeker ve DataFrame'e çevirir"""
+    """Veriyi çeker"""
     client = get_gspread_client()
     try:
-        sheet = client.open(SHEET_ADI).worksheet(sayfa_adi)
+        # DİKKAT: Burada senin verdiğin ID'yi kullanıyoruz
+        sheet = client.open_by_key(SHEET_ID).worksheet(sayfa_adi)
         data = sheet.get_all_records()
         return pd.DataFrame(data)
     except gspread.exceptions.WorksheetNotFound:
-        st.error(f"'{sayfa_adi}' isimli sayfa bulunamadı! Lütfen Google Sheet'te oluşturun.")
+        st.error(f"HATA: Tablonun altında '{sayfa_adi}' isminde bir sekme bulunamadı! Lütfen ismini düzeltin.")
+        st.stop()
+    except Exception as e:
+        st.error(f"Genel Hata: {e}")
         st.stop()
 
 def veri_ekle(sayfa_adi, veri_listesi):
     """Yeni satır ekler"""
     client = get_gspread_client()
-    sheet = client.open(SHEET_ADI).worksheet(sayfa_adi)
+    sheet = client.open_by_key(SHEET_ID).worksheet(sayfa_adi)
     sheet.append_row(veri_listesi)
 
 def veri_guncelle(sayfa_adi, etkinlik_adi, yeni_veri):
-    """Satırı bulur, siler ve güncel halini ekler"""
+    """Satırı günceller"""
     client = get_gspread_client()
-    sheet = client.open(SHEET_ADI).worksheet(sayfa_adi)
+    sheet = client.open_by_key(SHEET_ID).worksheet(sayfa_adi)
     
-    # Tüm veriyi çekip index bulma
     data = sheet.get_all_records()
     df = pd.DataFrame(data)
     
     try:
-        # Etkinlik adına göre satır numarasını bul (Sheet index 2'den başlar)
         idx = df.index[df['Etkinlik Adı'] == etkinlik_adi].tolist()[0]
         row_num = idx + 2
-        
-        sheet.delete_rows(row_num) # Eski satırı sil
-        sheet.append_row(yeni_veri) # Yeni satırı ekle
+        sheet.delete_rows(row_num)
+        sheet.append_row(yeni_veri)
         return True
     except:
         return False
 
 # --- 3. KULLANICI İŞLEMLERİ ---
 def kullanici_kontrol(kadi, sifre):
+    # 'Kullanicilar' sekmesini arar
     df = veri_cek("Kullanicilar")
-    # Verileri string'e çevirip kontrol et
+    if df.empty: return False
+    
     df['kullanici_adi'] = df['kullanici_adi'].astype(str)
     df['sifre'] = df['sifre'].astype(str)
     
@@ -98,7 +101,7 @@ def yeni_kullanici_kaydet(kadi, sifre, email):
 
 # --- 4. GİRİŞ EKRANI ---
 def giris_ekrani():
-    st.markdown("<h1 style='text-align: center;'>🎓 PUKÖ Etkinlik Sistemi </h1>", unsafe_allow_html=True)
+    st.markdown("<h1 style='text-align: center;'>🎓 PUKÖ Etkinlik Sistemi (Cloud)</h1>", unsafe_allow_html=True)
     
     col1, col2, col3 = st.columns([1,1,1])
     with col2:
@@ -130,7 +133,6 @@ def giris_ekrani():
 def ana_uygulama():
     user = st.session_state['user'].upper()
     
-    # Yan Menü
     with st.sidebar:
         st.success(f"👤 Aktif: {user}")
         if st.button("Çıkış Yap"):
@@ -138,13 +140,11 @@ def ana_uygulama():
             st.rerun()
         st.divider()
         
-        # Mod Seçimi
         mode = st.radio("İşlem:", ["Yeni Kayıt", "Düzenle"])
-        
         secilen_veri = {}
         eski_ad = None
         
-        # Verileri Google Sheet'ten Çek
+        # 'Etkinlikler' sekmesini arar
         df_etkinlikler = veri_cek("Etkinlikler")
         
         if mode == "Düzenle" and not df_etkinlikler.empty:
@@ -153,22 +153,17 @@ def ana_uygulama():
             if eski_ad:
                 secilen_veri = df_etkinlikler[df_etkinlikler["Etkinlik Adı"] == eski_ad].iloc[0].to_dict()
 
-    # Ana Sayfa Formu
     st.title("PUKÖ Döngüsü Yönetimi")
-    
     c1, c2 = st.columns(2)
     with c1:
         e_adi = st.text_input("Etkinlik Adı", value=secilen_veri.get("Etkinlik Adı", ""))
     with c2:
-        # Tarih verisini düzgün çekme
         mevcut_tarih = None
         if "Tarih" in secilen_veri:
             try: mevcut_tarih = pd.to_datetime(secilen_veri["Tarih"]).date()
             except: pass
         e_tarih = st.date_input("Tarih", value=mevcut_tarih)
 
-    # --- SORULAR ---
-    # Yardımcı fonksiyon: Seçilen veride varsa değerini (1/0) al, yoksa False
     def val(kod):
         if mode == "Düzenle" and kod in secilen_veri:
             return bool(secilen_veri[kod])
@@ -236,15 +231,12 @@ def ana_uygulama():
             cevaplar['o7'] = st.checkbox("Süreç değerlendirme toplantısı yapıldı mı?", value=val('o7'))
             cevaplar['o8'] = st.checkbox("İyileştirme kararları işlendi mi?", value=val('o8'))
 
-    # Not Alanı
     st.divider()
     st.subheader("📄 Etkinlik Notları")
     mevcut_not = str(secilen_veri.get("Notlar", ""))
     ekstra_not = st.text_area("Özel notlar ve hatırlatmalar:", value=mevcut_not, height=100)
 
-    # Hesaplama
     soru_degerleri = []
-    # Soru kodları sırasıyla 1 veya 0 olarak listeye eklenir
     for kod in SORU_KODLARI:
         deger = 1 if cevaplar[kod] else 0
         soru_degerleri.append(deger)
@@ -258,47 +250,36 @@ def ana_uygulama():
     c1.metric("Başarı Oranı", f"%{score}")
     c1.progress(score)
     
-    # Buton
     btn_text = "🔄 GÜNCELLE" if mode == "Düzenle" else "💾 KAYDET"
     if c2.button(btn_text, type="primary", use_container_width=True):
         if not e_adi:
             st.error("Lütfen Etkinlik Adı giriniz!")
         else:
-            # Google Sheets'e gidecek satır formatı:
-            # [Tarih, Etkinlik Adı, Sorumlu, Puan, Durum, Notlar, p1, p2, ..., o8]
             yeni_satir = [
-                str(e_tarih),
-                e_adi,
-                user,
-                score,
-                f"{tamamlanan}/{toplam_soru} Madde",
-                ekstra_not
-            ] + soru_degerleri # Listeleri birleştir
+                str(e_tarih), e_adi, user, score,
+                f"{tamamlanan}/{toplam_soru} Madde", ekstra_not
+            ] + soru_degerleri 
             
-            with st.spinner("Google Sheets'e kaydediliyor..."):
+            with st.spinner("Kaydediliyor..."):
                 if mode == "Düzenle":
-                    # Güncelleme mantığı: Eskiyi sil, yeniyi ekle
                     basari = veri_guncelle("Etkinlikler", eski_ad, yeni_satir)
-                    msg = "Etkinlik Güncellendi!"
+                    msg = "Güncellendi!"
                 else:
-                    # Yeni kayıt
                     veri_ekle("Etkinlikler", yeni_satir)
                     basari = True
-                    msg = "Etkinlik Kaydedildi!"
+                    msg = "Kaydedildi!"
             
             if basari:
                 st.success(f"✅ {msg}")
                 time.sleep(1)
                 st.rerun()
             else:
-                st.error("Bir hata oluştu, kayıt yapılamadı.")
+                st.error("Hata oluştu!")
 
-    # Tablo Gösterimi
     st.divider()
     st.subheader("Geçmiş Kayıtlar (Bulut)")
     st.dataframe(df_etkinlikler)
 
-# --- BAŞLANGIÇ ---
 if 'giris_yapildi' not in st.session_state:
     st.session_state['giris_yapildi'] = False
 
