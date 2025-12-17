@@ -102,7 +102,7 @@ def yeni_kullanici_kaydet(kadi, sifre, email):
 
 # --- 4. GİRİŞ EKRANI ---
 def giris_ekrani():
-    st.markdown("<h1 style='text-align: center;'>🎓 PUKÖ Etkinlik Sistemi (Cloud)</h1>", unsafe_allow_html=True)
+    st.markdown("<h1 style='text-align: center;'>🎓 PUKÖ Etkinlik Sistemi </h1>", unsafe_allow_html=True)
     
     col1, col2, col3 = st.columns([1,1,1])
     with col2:
@@ -288,3 +288,4 @@ if not st.session_state['giris_yapildi']:
 else:
 
     ana_uygulama()
+
