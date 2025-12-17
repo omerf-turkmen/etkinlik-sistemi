@@ -6,11 +6,11 @@ import time
 
 st.set_page_config(page_title="KAPUM Takip Sistemi", layout="wide", page_icon="🎓")
 
-# --- AYARLAR ---
+# - AYARLAR -
 SHEET_ID = "19NnN6bC_kbfrtViB80REjtqvSKr7OO727i2h7cx8Z0M"
 MAX_KULLANICI = 6
 
-# --- SORU LİSTELERİ ---
+# -SORU LİSTELERİ-
 SORULAR = {
     "PLANLA": [
         ("p1", "Etkinliğin amacı tanımlandı mı?"),
@@ -54,10 +54,10 @@ SORULAR = {
     ]
 }
 
-# Tüm kodları tek listede topluyoruz
+# Tüm kodları tek listede topluyoruz.
 TUM_KODLAR = [kod for liste in SORULAR.values() for kod, metin in liste]
 
-# --- 1. GOOGLE SHEET BAĞLANTISI ---
+# - GOOGLE SHEET BAĞLANTISI -
 def get_gspread_client():
     try:
         if "gcp_service_account" not in st.secrets:
@@ -75,7 +75,7 @@ def get_gspread_client():
         st.error(f"Google Bağlantı Hatası: {e}")
         st.stop()
 
-# --- 2. VERİTABANI İŞLEMLERİ (ÖNBELLEKLİ) ---
+# - VERİTABANI İŞLEMLERİ (ÖNBELLEKLİ) -
 @st.cache_data(ttl=10) 
 def veri_cek(sayfa_adi):
     client = get_gspread_client()
@@ -170,7 +170,7 @@ def giris_ekrani():
                 if durum: st.success(mesaj)
                 else: st.error(mesaj)
 
-# --- 5. ANA UYGULAMA ---
+# - ANA UYGULAMA -
 def ana_uygulama():
     user = st.session_state['user'].upper()
     
@@ -213,7 +213,7 @@ def ana_uygulama():
                 elif mode == "Düzenle / Sil" and secilen_veri:
                     st.session_state[kod] = bool(secilen_veri.get(kod, False))
 
-    st.title("PUKÖ Döngüsü Yönetimi")
+    st.title("KAPUM Etkinlik Takip Sistemi ve Yönetimi")
     
     c1, c2 = st.columns(2)
     with c1:
@@ -246,7 +246,7 @@ def ana_uygulama():
 
     st.divider()
     
-    # --- TÜMÜNÜ İŞARETLE (DOĞRU YÖNTEM - CALLBACK) ---
+    # - TÜMÜNÜ İŞARETLE (DOĞRU YÖNTEM - CALLBACK) -
     def tumunu_isaretle():
         for kod in TUM_KODLAR:
             st.session_state[kod] = True
