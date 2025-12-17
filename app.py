@@ -7,8 +7,8 @@ import time
 st.set_page_config(page_title="PUKÖ Takip Sistemi", layout="wide", page_icon="🎓")
 
 # --- AYARLAR ---
-# ARTIK DOSYA ADINA GEREK YOK, ID KULLANIYORUZ (GARANTİ YÖNTEM)
-SHEET_ID = "19NnN6bC_kbfrtViB80REjtqvSKr7OO727i2h7cx8Z0M" 
+# BURAYA DİREKT ID YAZIYORUZ (Senin verdiğin ID)
+SHEET_ID = "19NnN6bC_kbfrtViB80REjtqvSKr7OO727i2h7cx8Z0M"
 MAX_KULLANICI = 6
 
 # --- SORU KODLARI LİSTESİ ---
@@ -41,12 +41,12 @@ def veri_cek(sayfa_adi):
     """Veriyi çeker"""
     client = get_gspread_client()
     try:
-        # DİKKAT: Burada senin verdiğin ID'yi kullanıyoruz
+        # DÜZELTİLEN KISIM BURASI: open -> open_by_key
         sheet = client.open_by_key(SHEET_ID).worksheet(sayfa_adi)
         data = sheet.get_all_records()
         return pd.DataFrame(data)
     except gspread.exceptions.WorksheetNotFound:
-        st.error(f"HATA: Tablonun altında '{sayfa_adi}' isminde bir sekme bulunamadı! Lütfen ismini düzeltin.")
+        st.error(f"HATA: '{sayfa_adi}' isimli sekme bulunamadı! Lütfen sekme adını '{sayfa_adi}' yapın.")
         st.stop()
     except Exception as e:
         st.error(f"Genel Hata: {e}")
@@ -55,12 +55,14 @@ def veri_cek(sayfa_adi):
 def veri_ekle(sayfa_adi, veri_listesi):
     """Yeni satır ekler"""
     client = get_gspread_client()
+    # DÜZELTİLEN KISIM: open -> open_by_key
     sheet = client.open_by_key(SHEET_ID).worksheet(sayfa_adi)
     sheet.append_row(veri_listesi)
 
 def veri_guncelle(sayfa_adi, etkinlik_adi, yeni_veri):
     """Satırı günceller"""
     client = get_gspread_client()
+    # DÜZELTİLEN KISIM: open -> open_by_key
     sheet = client.open_by_key(SHEET_ID).worksheet(sayfa_adi)
     
     data = sheet.get_all_records()
@@ -77,7 +79,6 @@ def veri_guncelle(sayfa_adi, etkinlik_adi, yeni_veri):
 
 # --- 3. KULLANICI İŞLEMLERİ ---
 def kullanici_kontrol(kadi, sifre):
-    # 'Kullanicilar' sekmesini arar
     df = veri_cek("Kullanicilar")
     if df.empty: return False
     
@@ -144,7 +145,6 @@ def ana_uygulama():
         secilen_veri = {}
         eski_ad = None
         
-        # 'Etkinlikler' sekmesini arar
         df_etkinlikler = veri_cek("Etkinlikler")
         
         if mode == "Düzenle" and not df_etkinlikler.empty:
