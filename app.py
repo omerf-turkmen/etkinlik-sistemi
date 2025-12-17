@@ -269,14 +269,17 @@ def ana_uygulama():
 
     st.divider()
     
-    # --- YENİ ÖZELLİK: TÜMÜNÜ İŞARETLE BUTONU ---
+    # --- YENİ ÖZELLİK: TÜMÜNÜ İŞARETLE BUTONU (CALLBACK İLE) ---
+    
+    # 1. Önce işi yapacak fonksiyonu tanımlıyoruz
+    def tumunu_isaretle_fonksiyonu():
+        for kod in TUM_KODLAR:
+            st.session_state[kod] = True
+
+    # 2. Butona bu fonksiyonu bağlıyoruz (on_click parametresi ile)
     col_all, col_space = st.columns([1, 4])
     with col_all:
-        if st.button("✅ Tümünü İşaretle"):
-            for kod in TUM_KODLAR:
-                st.session_state[kod] = True
-            st.rerun() # Sayfayı yenile ki tikler görünsün
-
+        st.button("✅ Tümünü İşaretle", on_click=tumunu_isaretle_fonksiyonu)
     st.subheader("📄 Etkinlik Notları")
     mevcut_not = str(secilen_veri.get("Notlar", ""))
     ekstra_not = st.text_area("Özel notlar:", value=mevcut_not, height=100)
