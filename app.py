@@ -10,8 +10,7 @@ st.set_page_config(page_title="PUKÖ Takip Sistemi", layout="wide", page_icon="�
 SHEET_ID = "19NnN6bC_kbfrtViB80REjtqvSKr7OO727i2h7cx8Z0M"
 MAX_KULLANICI = 6
 
-# --- SORU LİSTELERİ (Kod ve Soru Metni Beraber) ---
-# Bu yapı sayesinde kodumuz çok daha temiz ve yönetilebilir olacak
+# --- SORU LİSTELERİ ---
 SORULAR = {
     "PLANLA": [
         ("p1", "Etkinliğin amacı tanımlandı mı?"),
@@ -55,7 +54,7 @@ SORULAR = {
     ]
 }
 
-# Tüm kodları tek listede toplayalım (Veritabanı işlemleri için)
+# Tüm kodları tek listede topluyoruz
 TUM_KODLAR = [kod for liste in SORULAR.values() for kod, metin in liste]
 
 # --- 1. GOOGLE SHEET BAĞLANTISI ---
@@ -185,24 +184,19 @@ def ana_uygulama():
         mode = st.radio("İşlem:", ["Yeni Kayıt", "Düzenle / Sil"])
         secilen_veri = {}
         eski_ad = None
-        mevcut_afis_linki = ""
         
         df_etkinlikler = veri_cek("Etkinlikler")
         
-        # Seçim Kutusunu Hazırla
         if mode == "Düzenle / Sil" and not df_etkinlikler.empty:
             liste = df_etkinlikler["Etkinlik Adı"].tolist()
             eski_ad = st.selectbox("Etkinlik Seç:", liste)
             if eski_ad:
                 secilen_veri = df_etkinlikler[df_etkinlikler["Etkinlik Adı"] == eski_ad].iloc[0].to_dict()
-                mevcut_afis_linki = str(secilen_veri.get("Afiş Linki", ""))
         
-        # --- DURUM YÖNETİMİ VE SIFIRLAMA ---
-        # Eğer kullanıcı "Yeni Kayıt"a geçerse veya etkinlik değiştirirse checkboxları ayarla
+        # --- DURUM SIFIRLAMA ---
         if 'last_mode' not in st.session_state: st.session_state['last_mode'] = None
         if 'last_event' not in st.session_state: st.session_state['last_event'] = None
 
-        # Mod değişirse veya Düzenle'de farklı etkinlik seçilirse session_state'i güncelle
         reset_needed = False
         if mode != st.session_state['last_mode']:
             reset_needed = True
@@ -214,26 +208,12 @@ def ana_uygulama():
 
         if reset_needed:
             for kod in TUM_KODLAR:
-                # Yeni kayıtsa hepsi False, Düzenle ise veritabanındaki değer
                 if mode == "Yeni Kayıt":
                     st.session_state[kod] = False
                 elif mode == "Düzenle / Sil" and secilen_veri:
                     st.session_state[kod] = bool(secilen_veri.get(kod, False))
 
     st.title("PUKÖ Döngüsü Yönetimi")
-    
-    # --- AFİŞ LINK GİRİŞİ ---
-    st.info("📷 **Etkinlik Fotoğrafı:** Resim linkini (URL) aşağıya yapıştırın.")
-    girilen_link = st.text_input("Resim Linki", value=mevcut_afis_linki)
-
-    if girilen_link:
-        try:
-            st.sidebar.divider()
-            st.sidebar.markdown("### 🖼️ Seçili Afiş")
-            st.sidebar.image(girilen_link, caption="Etkinlik Görseli", use_container_width=True)
-        except: pass
-
-    st.divider()
     
     c1, c2 = st.columns(2)
     with c1:
@@ -245,16 +225,13 @@ def ana_uygulama():
             except: pass
         e_tarih = st.date_input("Tarih", value=mevcut_tarih)
 
-    # --- SEKMELER VE CHECKBOXLAR ---
+    # --- SEKMELER ---
     t1, t2, t3 = st.tabs(["🟦 PLANLA", "🟧 KONTROL ET", "🟥 ÖNLEM AL"])
     
-    # Checkbox oluşturucu yardımcı fonksiyon
     def create_checkbox_group(soru_listesi):
         for kod, metin in soru_listesi:
-            # Session state'de yoksa False ata
             if kod not in st.session_state:
                 st.session_state[kod] = False
-            # Key vererek session_state ile bağlıyoruz
             st.checkbox(metin, key=kod)
 
     with t1:
@@ -269,22 +246,20 @@ def ana_uygulama():
 
     st.divider()
     
-    # --- YENİ ÖZELLİK: TÜMÜNÜ İŞARETLE BUTONU (CALLBACK İLE) ---
-    
-    # 1. Önce işi yapacak fonksiyonu tanımlıyoruz
-    def tumunu_isaretle_fonksiyonu():
+    # --- TÜMÜNÜ İŞARETLE (DOĞRU YÖNTEM - CALLBACK) ---
+    def tumunu_isaretle():
         for kod in TUM_KODLAR:
             st.session_state[kod] = True
-
-    # 2. Butona bu fonksiyonu bağlıyoruz (on_click parametresi ile)
+            
     col_all, col_space = st.columns([1, 4])
     with col_all:
-        st.button("✅ Tümünü İşaretle", on_click=tumunu_isaretle_fonksiyonu)
+        st.button("✅ Tümünü İşaretle", on_click=tumunu_isaretle)
+
     st.subheader("📄 Etkinlik Notları")
     mevcut_not = str(secilen_veri.get("Notlar", ""))
     ekstra_not = st.text_area("Özel notlar:", value=mevcut_not, height=100)
 
-    # Puan Hesaplama (Session State'den okuyoruz artık)
+    # Puan Hesapla
     soru_degerleri = [1 if st.session_state[kod] else 0 for kod in TUM_KODLAR]
     tamamlanan = sum(soru_degerleri)
     toplam_soru = len(TUM_KODLAR)
@@ -301,20 +276,20 @@ def ana_uygulama():
         if not e_adi:
             st.error("Lütfen Etkinlik Adı giriniz!")
         else:
+            # Kaydedilecek satır (Afiş Linki YOK)
             yeni_satir = [
                 str(e_tarih), e_adi, user, score,
-                f"{tamamlanan}/{toplam_soru} Madde", ekstra_not,
-                girilen_link 
+                f"{tamamlanan}/{toplam_soru} Madde", ekstra_not
             ] + soru_degerleri 
             
             with st.spinner("İşlem yapılıyor..."):
                 if mode == "Düzenle / Sil":
                     basari = veri_guncelle("Etkinlikler", eski_ad, yeni_satir)
-                    msg = "Etkinlik Güncellendi!"
+                    msg = "Güncellendi!"
                 else:
                     veri_ekle("Etkinlikler", yeni_satir)
                     basari = True
-                    msg = "Etkinlik Kaydedildi!"
+                    msg = "Kaydedildi!"
             
             if basari:
                 st.success(f"✅ {msg}")
@@ -338,8 +313,9 @@ def ana_uygulama():
 
     st.divider()
     st.subheader("Geçmiş Kayıtlar")
+    # Afiş sütunu olmasa da hata vermesin diye try-except ile gösteriyoruz
     try:
-        st.dataframe(df_etkinlikler, column_config={"Afiş Linki": st.column_config.LinkColumn("Afiş")})
+        st.dataframe(df_etkinlikler.drop(columns=["Afiş Linki"], errors='ignore'))
     except:
         st.dataframe(df_etkinlikler)
 
