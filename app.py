@@ -10,14 +10,55 @@ st.set_page_config(page_title="PUKÖ Takip Sistemi", layout="wide", page_icon="�
 SHEET_ID = "19NnN6bC_kbfrtViB80REjtqvSKr7OO727i2h7cx8Z0M"
 MAX_KULLANICI = 6
 
-# --- SORU KODLARI LİSTESİ ---
-SORU_KODLARI = [
-    'p1','p2','p3','p4','p5','p6','p7','p8','p9','p10','p11','p12','p13','p14','p15','p16','p17',
-    'k1','k2','k3','k4','k5','k6','k7','k8','k9',
-    'o1','o2','o3','o4','o5','o6','o7','o8'
-]
+# --- SORU LİSTELERİ (Kod ve Soru Metni Beraber) ---
+# Bu yapı sayesinde kodumuz çok daha temiz ve yönetilebilir olacak
+SORULAR = {
+    "PLANLA": [
+        ("p1", "Etkinliğin amacı tanımlandı mı?"),
+        ("p2", "Hedef kitle belirlendi mi?"),
+        ("p3", "Etkinlik türü netleşti mi?"),
+        ("p4", "Kazanımlar/beklenen çıktılar yazıldı mı?"),
+        ("p5", "Konuşmacı ve işveren kurumu belli mi?"),
+        ("p6", "Resmî davet gönderildi"),
+        ("p7", "Konuşmacı özgeçmişi/etkinlik özeti alındı"),
+        ("p8", "Konuşmacı ihtiyaçları planlandı"),
+        ("p9", "Tarih/Saat kesinleşti"),
+        ("p10", "Salon/online platform rezervasyonu yapıldı"),
+        ("p11", "Etkinlik akış ve zaman yönetimi oluşturuldu"),
+        ("p12", "İnsan kaynağı görevlendirmeleri yapıldı"),
+        ("p13", "Ses sistemi, projeksiyon, bilgisayar test edildi"),
+        ("p14", "Yedek teknik ekipmanlar hazır"),
+        ("p15", "Afiş, poster, banner hazırlandı"),
+        ("p16", "Yoklama sistemi hazırlandı"),
+        ("p17", "Kapanış ve teşekkür gerçekleştirildi")
+    ],
+    "KONTROL": [
+        ("k1", "Katılımcı sayısı raporlandı"),
+        ("k2", "Hedef kitlenin uygunluğu değerlendirildi"),
+        ("k3", "Katılım istatistikleri kaydedildi"),
+        ("k4", "Katılımcı memnuniyet anketi yapıldı"),
+        ("k5", "Konuşmacı değerlendirmesi alındı"),
+        ("k6", "Teknik süreçlerin güçlü/zayıf yönleri kaydedildi"),
+        ("k7", "Beklenen amaç ve kazanımlar gerçekleşti mi?"),
+        ("k8", "Paydaş geri bildirimleri analiz edildi mi?"),
+        ("k9", "Sunum ve materyaller arşivlendi mi?")
+    ],
+    "ONLEM": [
+        ("o1", "Eksik ve aksayanlar belirlendi"),
+        ("o2", "İyileştirme önerileri yazıldı"),
+        ("o3", "Planlama sürecinde değişiklik gerekenler belirlendi"),
+        ("o4", "Etkinlik raporu hazırlandı"),
+        ("o5", "Fotoğraf ve haber metni paylaşıldı"),
+        ("o6", "Tüm dokümanlar arşive eklendi"),
+        ("o7", "Süreç değerlendirme toplantısı yapıldı mı?"),
+        ("o8", "İyileştirme kararları işlendi mi?")
+    ]
+}
 
-# --- 1. GOOGLE SHEETS BAĞLANTISI ---
+# Tüm kodları tek listede toplayalım (Veritabanı işlemleri için)
+TUM_KODLAR = [kod for liste in SORULAR.values() for kod, metin in liste]
+
+# --- 1. GOOGLE SHEET BAĞLANTISI ---
 def get_gspread_client():
     try:
         if "gcp_service_account" not in st.secrets:
@@ -35,57 +76,52 @@ def get_gspread_client():
         st.error(f"Google Bağlantı Hatası: {e}")
         st.stop()
 
-# --- 2. VERİTABANI İŞLEMLERİ ---
+# --- 2. VERİTABANI İŞLEMLERİ (ÖNBELLEKLİ) ---
+@st.cache_data(ttl=10) 
 def veri_cek(sayfa_adi):
-    """Veriyi çeker"""
     client = get_gspread_client()
     try:
         sheet = client.open_by_key(SHEET_ID).worksheet(sayfa_adi)
         data = sheet.get_all_records()
         return pd.DataFrame(data)
-    except gspread.exceptions.WorksheetNotFound:
-        st.error(f"HATA: '{sayfa_adi}' isimli sekme bulunamadı!")
-        st.stop()
     except Exception as e:
-        st.error(f"Genel Hata: {e}")
+        st.error(f"Hata ({sayfa_adi}): {e}")
         st.stop()
 
+def temizle_cache():
+    st.cache_data.clear()
+
 def veri_ekle(sayfa_adi, veri_listesi):
-    """Yeni satır ekler"""
     client = get_gspread_client()
     sheet = client.open_by_key(SHEET_ID).worksheet(sayfa_adi)
     sheet.append_row(veri_listesi)
+    temizle_cache()
 
 def veri_guncelle(sayfa_adi, etkinlik_adi, yeni_veri):
-    """Satırı günceller"""
     client = get_gspread_client()
     sheet = client.open_by_key(SHEET_ID).worksheet(sayfa_adi)
-    
     data = sheet.get_all_records()
     df = pd.DataFrame(data)
-    
     try:
         idx = df.index[df['Etkinlik Adı'] == etkinlik_adi].tolist()[0]
         row_num = idx + 2
         sheet.delete_rows(row_num)
         sheet.append_row(yeni_veri)
+        temizle_cache()
         return True
     except:
         return False
 
 def veri_sil(sayfa_adi, etkinlik_adi):
-    """Satırı tamamen siler"""
     client = get_gspread_client()
     sheet = client.open_by_key(SHEET_ID).worksheet(sayfa_adi)
-    
     data = sheet.get_all_records()
     df = pd.DataFrame(data)
-    
     try:
-        # Etkinlik adına göre satırı bul ve sil
         idx = df.index[df['Etkinlik Adı'] == etkinlik_adi].tolist()[0]
-        row_num = idx + 2 # Google Sheet 1'den başlar + 1 başlık satırı
+        row_num = idx + 2
         sheet.delete_rows(row_num)
+        temizle_cache()
         return True
     except:
         return False
@@ -94,33 +130,26 @@ def veri_sil(sayfa_adi, etkinlik_adi):
 def kullanici_kontrol(kadi, sifre):
     df = veri_cek("Kullanicilar")
     if df.empty: return False
-    
     df['kullanici_adi'] = df['kullanici_adi'].astype(str)
     df['sifre'] = df['sifre'].astype(str)
-    
     user = df[(df["kullanici_adi"] == kadi) & (df["sifre"] == str(sifre))]
     return not user.empty
 
 def yeni_kullanici_kaydet(kadi, sifre, email):
     df = veri_cek("Kullanicilar")
-    
     if len(df) >= MAX_KULLANICI:
         return False, f"Kullanıcı Sınırı Doldu! (Max {MAX_KULLANICI})"
-    
     if kadi in df["kullanici_adi"].values:
         return False, "Bu kullanıcı adı alınmış."
-        
     veri_ekle("Kullanicilar", [kadi, sifre, email])
     return True, "Kayıt Başarılı!"
 
 # --- 4. GİRİŞ EKRANI ---
 def giris_ekrani():
-    st.markdown("<h1 style='text-align: center;'>🎓 PUKÖ Etkinlik Sistemi (Cloud)</h1>", unsafe_allow_html=True)
-    
+    st.markdown("<h1 style='text-align: center;'>🎓 PUKÖ Giriş</h1>", unsafe_allow_html=True)
     col1, col2, col3 = st.columns([1,1,1])
     with col2:
         tab1, tab2 = st.tabs(["Giriş Yap", "Kayıt Ol"])
-        
         with tab1:
             kadi = st.text_input("Kullanıcı Adı")
             sifre = st.text_input("Şifre", type="password")
@@ -132,8 +161,7 @@ def giris_ekrani():
                     time.sleep(0.5)
                     st.rerun()
                 else:
-                    st.error("Kullanıcı adı veya şifre hatalı.")
-        
+                    st.error("Hatalı Bilgi.")
         with tab2:
             nkadi = st.text_input("Yeni Kullanıcı Adı")
             nmail = st.text_input("E-posta")
@@ -157,16 +185,56 @@ def ana_uygulama():
         mode = st.radio("İşlem:", ["Yeni Kayıt", "Düzenle / Sil"])
         secilen_veri = {}
         eski_ad = None
+        mevcut_afis_linki = ""
         
         df_etkinlikler = veri_cek("Etkinlikler")
         
+        # Seçim Kutusunu Hazırla
         if mode == "Düzenle / Sil" and not df_etkinlikler.empty:
             liste = df_etkinlikler["Etkinlik Adı"].tolist()
-            eski_ad = st.selectbox("İşlem Yapılacak Etkinlik:", liste)
+            eski_ad = st.selectbox("Etkinlik Seç:", liste)
             if eski_ad:
                 secilen_veri = df_etkinlikler[df_etkinlikler["Etkinlik Adı"] == eski_ad].iloc[0].to_dict()
+                mevcut_afis_linki = str(secilen_veri.get("Afiş Linki", ""))
+        
+        # --- DURUM YÖNETİMİ VE SIFIRLAMA ---
+        # Eğer kullanıcı "Yeni Kayıt"a geçerse veya etkinlik değiştirirse checkboxları ayarla
+        if 'last_mode' not in st.session_state: st.session_state['last_mode'] = None
+        if 'last_event' not in st.session_state: st.session_state['last_event'] = None
+
+        # Mod değişirse veya Düzenle'de farklı etkinlik seçilirse session_state'i güncelle
+        reset_needed = False
+        if mode != st.session_state['last_mode']:
+            reset_needed = True
+            st.session_state['last_mode'] = mode
+        
+        if mode == "Düzenle / Sil" and eski_ad != st.session_state['last_event']:
+            reset_needed = True
+            st.session_state['last_event'] = eski_ad
+
+        if reset_needed:
+            for kod in TUM_KODLAR:
+                # Yeni kayıtsa hepsi False, Düzenle ise veritabanındaki değer
+                if mode == "Yeni Kayıt":
+                    st.session_state[kod] = False
+                elif mode == "Düzenle / Sil" and secilen_veri:
+                    st.session_state[kod] = bool(secilen_veri.get(kod, False))
 
     st.title("PUKÖ Döngüsü Yönetimi")
+    
+    # --- AFİŞ LINK GİRİŞİ ---
+    st.info("📷 **Etkinlik Fotoğrafı:** Resim linkini (URL) aşağıya yapıştırın.")
+    girilen_link = st.text_input("Resim Linki", value=mevcut_afis_linki)
+
+    if girilen_link:
+        try:
+            st.sidebar.divider()
+            st.sidebar.markdown("### 🖼️ Seçili Afiş")
+            st.sidebar.image(girilen_link, caption="Etkinlik Görseli", use_container_width=True)
+        except: pass
+
+    st.divider()
+    
     c1, c2 = st.columns(2)
     with c1:
         e_adi = st.text_input("Etkinlik Adı", value=secilen_veri.get("Etkinlik Adı", ""))
@@ -177,102 +245,63 @@ def ana_uygulama():
             except: pass
         e_tarih = st.date_input("Tarih", value=mevcut_tarih)
 
-    def val(kod):
-        if mode == "Düzenle / Sil" and kod in secilen_veri:
-            return bool(secilen_veri[kod])
-        return False
-
+    # --- SEKMELER VE CHECKBOXLAR ---
     t1, t2, t3 = st.tabs(["🟦 PLANLA", "🟧 KONTROL ET", "🟥 ÖNLEM AL"])
-    cevaplar = {}
+    
+    # Checkbox oluşturucu yardımcı fonksiyon
+    def create_checkbox_group(soru_listesi):
+        for kod, metin in soru_listesi:
+            # Session state'de yoksa False ata
+            if kod not in st.session_state:
+                st.session_state[kod] = False
+            # Key vererek session_state ile bağlıyoruz
+            st.checkbox(metin, key=kod)
 
     with t1:
-        c1, c2 = st.columns(2)
-        with c1:
-            st.subheader("1. Amaç")
-            cevaplar['p1'] = st.checkbox("Etkinliğin amacı tanımlandı mı?", value=val('p1'))
-            cevaplar['p2'] = st.checkbox("Hedef kitle belirlendi mi?", value=val('p2'))
-            cevaplar['p3'] = st.checkbox("Etkinlik türü netleşti mi?", value=val('p3'))
-            cevaplar['p4'] = st.checkbox("Kazanımlar/beklenen çıktılar yazıldı mı?", value=val('p4'))
-            st.subheader("2. Paydaş ve Konuşmacı")
-            cevaplar['p5'] = st.checkbox("Konuşmacı ve işveren kurumu belli mi?", value=val('p5'))
-            cevaplar['p6'] = st.checkbox("Resmî davet gönderildi", value=val('p6'))
-            cevaplar['p7'] = st.checkbox("Konuşmacı özgeçmişi/etkinlik özeti alındı", value=val('p7'))
-            cevaplar['p8'] = st.checkbox("Konuşmacı ihtiyaçları planlandı", value=val('p8'))
-        with c2:
-            st.subheader("3. Zaman/Mekan")
-            cevaplar['p9'] = st.checkbox("Tarih/Saat kesinleşti", value=val('p9'))
-            cevaplar['p10'] = st.checkbox("Salon/online platform rezervasyonu yapıldı", value=val('p10'))
-            cevaplar['p11'] = st.checkbox("Etkinlik akış ve zaman yönetimi oluşturuldu", value=val('p11'))
-            cevaplar['p12'] = st.checkbox("İnsan kaynağı görevlendirmeleri yapıldı", value=val('p12'))
-            st.subheader("4. Teknik Hazırlık")
-            cevaplar['p13'] = st.checkbox("Ses sistemi, projeksiyon, bilgisayar test edildi", value=val('p13'))
-            cevaplar['p14'] = st.checkbox("Yedek teknik ekipmanlar hazır", value=val('p14'))
-            cevaplar['p15'] = st.checkbox("Afiş, poster, banner hazırlandı", value=val('p15'))
-            cevaplar['p16'] = st.checkbox("Yoklama sistemi hazırlandı", value=val('p16'))
-            cevaplar['p17'] = st.checkbox("Kapanış ve teşekkür gerçekleştirildi", value=val('p17'))
-
+        st.subheader("Planlama Süreci")
+        create_checkbox_group(SORULAR["PLANLA"])
     with t2:
-        c1, c2 = st.columns(2)
-        with c1:
-            st.subheader("1. Veriler")
-            cevaplar['k1'] = st.checkbox("Katılımcı sayısı raporlandı", value=val('k1'))
-            cevaplar['k2'] = st.checkbox("Hedef kitlenin uygunluğu değerlendirildi", value=val('k2'))
-            cevaplar['k3'] = st.checkbox("Katılım istatistikleri kaydedildi", value=val('k3'))
-            st.subheader("2. Geri Bildirim")
-            cevaplar['k4'] = st.checkbox("Katılımcı memnuniyet anketi yapıldı", value=val('k4'))
-            cevaplar['k5'] = st.checkbox("Konuşmacı değerlendirmesi alındı", value=val('k5'))
-            cevaplar['k6'] = st.checkbox("Teknik süreçlerin güçlü/zayıf yönleri kaydedildi", value=val('k6'))
-        with c2:
-            st.subheader("3. Çıktılar")
-            cevaplar['k7'] = st.checkbox("Beklenen amaç ve kazanımlar gerçekleşti mi?", value=val('k7'))
-            cevaplar['k8'] = st.checkbox("Paydaş geri bildirimleri analiz edildi mi?", value=val('k8'))
-            cevaplar['k9'] = st.checkbox("Sunum ve materyaller arşivlendi mi?", value=val('k9'))
-
+        st.subheader("Kontrol Süreci")
+        create_checkbox_group(SORULAR["KONTROL"])
     with t3:
-        c1, c2 = st.columns(2)
-        with c1:
-            st.subheader("1. İyileştirme")
-            cevaplar['o1'] = st.checkbox("Eksik ve aksayanlar belirlendi", value=val('o1'))
-            cevaplar['o2'] = st.checkbox("İyileştirme önerileri yazıldı", value=val('o2'))
-            cevaplar['o3'] = st.checkbox("Planlama sürecinde değişiklik gerekenler belirlendi", value=val('o3'))
-        with c2:
-            st.subheader("2. Raporlama")
-            cevaplar['o4'] = st.checkbox("Etkinlik raporu hazırlandı", value=val('o4'))
-            cevaplar['o5'] = st.checkbox("Fotoğraf ve haber metni paylaşıldı", value=val('o5'))
-            cevaplar['o6'] = st.checkbox("Tüm dokümanlar arşive eklendi", value=val('o6'))
-            st.subheader("3. Sürdürülebilirlik")
-            cevaplar['o7'] = st.checkbox("Süreç değerlendirme toplantısı yapıldı mı?", value=val('o7'))
-            cevaplar['o8'] = st.checkbox("İyileştirme kararları işlendi mi?", value=val('o8'))
+        st.subheader("Önlem Alma Süreci")
+        create_checkbox_group(SORULAR["ONLEM"])
 
     st.divider()
+    
+    # --- YENİ ÖZELLİK: TÜMÜNÜ İŞARETLE BUTONU ---
+    col_all, col_space = st.columns([1, 4])
+    with col_all:
+        if st.button("✅ Tümünü İşaretle"):
+            for kod in TUM_KODLAR:
+                st.session_state[kod] = True
+            st.rerun() # Sayfayı yenile ki tikler görünsün
+
     st.subheader("📄 Etkinlik Notları")
     mevcut_not = str(secilen_veri.get("Notlar", ""))
-    ekstra_not = st.text_area("Özel notlar ve hatırlatmalar:", value=mevcut_not, height=100)
+    ekstra_not = st.text_area("Özel notlar:", value=mevcut_not, height=100)
 
-    soru_degerleri = []
-    for kod in SORU_KODLARI:
-        deger = 1 if cevaplar[kod] else 0
-        soru_degerleri.append(deger)
-    
+    # Puan Hesaplama (Session State'den okuyoruz artık)
+    soru_degerleri = [1 if st.session_state[kod] else 0 for kod in TUM_KODLAR]
     tamamlanan = sum(soru_degerleri)
-    toplam_soru = len(SORU_KODLARI)
+    toplam_soru = len(TUM_KODLAR)
     score = int((tamamlanan/toplam_soru)*100)
     
     st.divider()
-    c1, c2 = st.columns([3,1])
-    c1.metric("Başarı Oranı", f"%{score}")
-    c1.progress(score)
+    c1_btn, c2_btn = st.columns([3,1])
+    c1_btn.metric("Başarı Oranı", f"%{score}")
+    c1_btn.progress(score)
     
-    # --- KAYDETME VE SİLME BUTONLARI ---
     btn_text = "🔄 GÜNCELLE" if mode == "Düzenle / Sil" else "💾 KAYDET"
     
-    if c2.button(btn_text, type="primary", use_container_width=True):
+    if c2_btn.button(btn_text, type="primary", use_container_width=True):
         if not e_adi:
             st.error("Lütfen Etkinlik Adı giriniz!")
         else:
             yeni_satir = [
                 str(e_tarih), e_adi, user, score,
-                f"{tamamlanan}/{toplam_soru} Madde", ekstra_not
+                f"{tamamlanan}/{toplam_soru} Madde", ekstra_not,
+                girilen_link 
             ] + soru_degerleri 
             
             with st.spinner("İşlem yapılıyor..."):
@@ -291,23 +320,25 @@ def ana_uygulama():
             else:
                 st.error("Hata oluştu!")
 
-    # --- SİLME BUTONU (SADECE DÜZENLE MODUNDA GÖRÜNÜR) ---
     if mode == "Düzenle / Sil" and eski_ad:
         st.divider()
         st.warning("⚠️ Dikkat: Silinen etkinlik geri getirilemez!")
         if st.button("🗑️ BU ETKİNLİĞİ SİL", use_container_width=True):
-            with st.spinner("Etkinlik siliniyor..."):
+            with st.spinner("Siliniyor..."):
                 basari = veri_sil("Etkinlikler", eski_ad)
                 if basari:
-                    st.success("Etkinlik başarıyla silindi!")
+                    st.success("Silindi!")
                     time.sleep(1)
                     st.rerun()
                 else:
-                    st.error("Silme işlemi başarısız oldu.")
+                    st.error("Hata!")
 
     st.divider()
-    st.subheader("Geçmiş Kayıtlar (Bulut)")
-    st.dataframe(df_etkinlikler)
+    st.subheader("Geçmiş Kayıtlar")
+    try:
+        st.dataframe(df_etkinlikler, column_config={"Afiş Linki": st.column_config.LinkColumn("Afiş")})
+    except:
+        st.dataframe(df_etkinlikler)
 
 if 'giris_yapildi' not in st.session_state:
     st.session_state['giris_yapildi'] = False
